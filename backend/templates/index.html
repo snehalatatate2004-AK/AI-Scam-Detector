@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Scam Detector Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body {
+    margin: 0;
+    font-family: Arial;
+    background: #556482;
+    color: white;
+}
+
+/* HEADER */
+.header {
+    background: #111827;
+    padding: 15px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    color: #22c55e;
+}
+
+/* STATS */
+.stats-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.stat-card {
+    background: #1f2937;
+    padding: 15px;
+    border-radius: 12px;
+    width: 140px;
+    text-align: center;
+}
+
+/* MAIN CARD */
+.container {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.card {
+    background: #1f2937;
+    padding: 20px;
+    border-radius: 15px;
+    width: 550px;
+}
+
+/* INPUT */
+input, button {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border: none;
+}
+
+button {
+    background: #22c55e;
+    color: white;
+    cursor: pointer;
+}
+
+/* BUTTON ROW */
+.btn-row {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-row button {
+    width: 50%;
+}
+
+/* ✅ FIX 1: CHART CENTER */
+.chart-container {
+    width: 200px;
+    margin: 20px auto;   /* center */
+}
+
+/* RESULT CARD */
+.result-card {
+    background: #111827;
+    padding: 12px;
+    margin-top: 10px;
+    border-radius: 10px;
+}
+
+.safe { color: #22c55e; }
+.danger { color: red; }
+.sus { color: orange; }
+
+/* PROGRESS */
+.progress {
+    background: #334155;
+    border-radius: 10px;
+    height: 8px;
+}
+
+.progress-bar {
+    height: 8px;
+    background: linear-gradient(90deg, #22c55e, #facc15, #ef4444);
+}
+
+/* ✅ FIX 2: SCROLLABLE HISTORY */
+#history {
+    max-height: 250px;
+    overflow-y: auto;
+    margin-top: 10px;
+    padding-right: 5px;
+}
+
+/* OPTIONAL: Scrollbar style */
+#history::-webkit-scrollbar {
+    width: 6px;
+}
+#history::-webkit-scrollbar-thumb {
+    background: #22c55e;
+    border-radius: 10px;
+}
+.header {
+    background: #111827;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-size: 22px;
+    font-weight: bold;
+    color: #22c55e;
+}
+
+.header-title {
+    width: 100%;
+    text-align: center;
+}
+
+/* PROFILE RIGHT */
+.profile {
+    position: absolute;
+    right: 20px;
+    cursor: pointer;
+}
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+/* DROPDOWN */
+.dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 50px;
+    background: white;
+    color: black;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.dropdown.show {
+    display: block;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="header">
+
+    <div class="header-title">🔐 AI Scam Detection Dashboard</div>
+
+    <div class="profile" onclick="toggleMenu()">
+        <img src="https://static.vecteezy.com/system/resources/previews/020/526/176/original/3d-user-login-or-verification-icon-human-symbol-mobile-ui-ux-app-icons-vector.jpg"
+             class="avatar">
+
+        <div id="dropdown" class="dropdown">
+            <p onclick="logout()">🚪 Logout</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- STATS -->
+<div class="stats-container">
+    <div class="stat-card">
+        <h3>Total</h3>
+        <p id="totalCount">0</p>
+    </div>
+    <div class="stat-card">
+        <h3>Safe</h3>
+        <p id="safeCountText">0</p>
+    </div>
+    <div class="stat-card">
+        <h3>Suspicious</h3>
+        <p id="susCountText">0</p>
+    </div>
+    <div class="stat-card">
+        <h3>Danger</h3>
+        <p id="dangerCountText">0</p>
+    </div>
+</div>
+
+<div class="container">
+<div class="card">
+
+<input type="text" id="urlInput" placeholder="Enter URL">
+
+<div class="btn-row">
+    <button onclick="checkURL()">Analyze</button>
+    <button onclick="clearHistory()" style="background:red;">Clear</button>
+</div>
+
+<div class="chart-container">
+    <canvas id="chart"></canvas>
+</div>
+
+<div id="history"></div>
+
+</div>
+</div>
+
+<script>
+let safeCount=0, dangerCount=0, susCount=0;
+
+const chart = new Chart(document.getElementById('chart'), {
+    type: 'pie',
+    data: { labels:['Safe','Suspicious','Dangerous'], datasets:[{data:[0,0,0]}] }
+});
+
+function updateChart(){
+    chart.data.datasets[0].data=[safeCount,susCount,dangerCount];
+    chart.update();
+}
+
+async function loadHistory(){
+    safeCount=0; dangerCount=0; susCount=0;
+
+    const res = await fetch("/history", {
+        credentials: "include"
+    });
+
+    const data = await res.json();
+
+    const history = document.getElementById("history");
+    history.innerHTML="";
+
+    data.forEach(item=>{
+        let color="", icon="";
+
+        if(item.status==="Dangerous"){
+            color="danger"; dangerCount++; icon="🔴";
+        }
+        else if(item.status==="Suspicious"){
+            color="sus"; susCount++; icon="🟡";
+        }
+        else{
+            color="safe"; safeCount++; icon="🟢";
+        }
+
+        history.innerHTML += `
+        <div class="result-card">
+            <h4>🔗 ${item.url}</h4>
+            <p>🌐 ${item.domain}</p>
+
+            <div class="progress">
+                <div class="progress-bar" style="width:${item.score}%"></div>
+            </div>
+
+            <p>Score: ${item.score}</p>
+            <p class="${color}">${icon} ${item.status}</p>
+        </div>
+        `;
+    });
+
+    document.getElementById("safeCountText").innerText = safeCount;
+    document.getElementById("dangerCountText").innerText = dangerCount;
+    document.getElementById("susCountText").innerText = susCount;
+    document.getElementById("totalCount").innerText = safeCount + dangerCount + susCount;
+
+    updateChart();
+}
+
+async function checkURL(){
+    const url=document.getElementById("urlInput").value;
+    if(!url) return alert("Enter URL first!");
+
+    await fetch("/check",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({url}),
+        credentials: "include"
+    });
+
+    document.getElementById("urlInput").value="";
+    loadHistory();
+}
+
+function clearHistory(){
+    document.getElementById("history").innerHTML="";
+    safeCount=0; dangerCount=0; susCount=0;
+    updateChart();
+}
+
+function toggleMenu(){
+    document.getElementById("dropdown").classList.toggle("show");
+}
+
+function logout(){
+    window.location.href="/";
+}
+window.onload=loadHistory;
+</script>
+
+</body>
+</html>

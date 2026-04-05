@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Login</title>
+
+<style>
+body{
+    text-align:center;
+    margin-top:100px;
+    font-family:Arial;
+    background:#556482;
+    color:white;
+}
+
+.card{
+    background:#1f2937;
+    padding:30px;
+    border-radius:15px;
+    width:300px;
+    margin:auto;
+}
+
+input{
+    width:100%;
+    padding:10px;
+    margin:10px 0;
+    border-radius:8px;
+    border:none;
+}
+
+button{
+    width:48%;
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.login-btn{
+    background:#22c55e;
+    color:white;
+}
+
+.signup-btn{
+    background:#3b82f6;
+    color:white;
+}
+
+button:hover{
+    transform:scale(1.05);
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+    <h2>🔐 Login</h2>
+
+    <input id="user" placeholder="Username">
+    <input id="pass" type="password" placeholder="Password">
+
+    <div style="display:flex; gap:10px;">
+        <button class="login-btn" onclick="login()">Login</button>
+        <button class="signup-btn" onclick="signup()">Signup</button>
+    </div>
+</div>
+
+<script>
+
+// 🔥 LOGIN FUNCTION
+async function login(){
+
+    const username = document.getElementById("user").value.trim();
+    const password = document.getElementById("pass").value.trim();
+
+    if(!username || !password){
+        alert("⚠️ Enter username & password");
+        return;
+    }
+
+    try{
+        const res = await fetch("/login", {
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        console.log("LOGIN RESPONSE:", data); // 🔥 DEBUG
+
+        if(data.success){
+            // ✅ IMPORTANT (session set झाल्यावर redirect)
+            window.location.href = "/dashboard";
+        } else {
+            alert(data.message || "❌ Invalid login");
+        }
+
+    }catch(err){
+        console.log(err);
+        alert("Server error");
+    }
+}
+
+
+// 🔥 SIGNUP FUNCTION
+async function signup(){
+
+    const username = document.getElementById("user").value.trim();
+    const password = document.getElementById("pass").value.trim();
+
+    if(!username || !password){
+        alert("⚠️ Enter username & password");
+        return;
+    }
+
+    try{
+        const res = await fetch("/signup", {
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if(data.success){
+            alert("✅ Signup successful! Now login.");
+        } else {
+            alert(data.message || "User already exists");
+        }
+
+    }catch(err){
+        console.log(err);
+        alert("Server error");
+    }
+}
+
+</script>
+
+</body>
+</html>

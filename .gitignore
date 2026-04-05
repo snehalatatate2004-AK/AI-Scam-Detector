@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+scam.db
+model.pkl
+vectorizer.pkl
