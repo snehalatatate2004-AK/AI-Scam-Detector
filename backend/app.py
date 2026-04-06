@@ -1,3 +1,4 @@
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, request, jsonify, render_template, redirect, session
 from flask_cors import CORS
 import joblib
@@ -109,7 +110,46 @@ def home():
 def dashboard():
     if "user" not in session:
         return redirect("/")
+
+    # 🔥 ADMIN CHECK
+    if session["user"] == "admin":
+        return redirect("/admin")
+
     return render_template("index.html")
+
+@app.route("/admin")
+def admin():
+    if "user" not in session or session["user"] != "admin":
+        return redirect("/")
+
+    return render_template("admin.html")
+
+@app.route("/admin-data")
+def admin_data():
+    if "user" not in session or session["user"] != "admin":
+        return jsonify([])
+
+    conn = sqlite3.connect("scam.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT username, url, status, score 
+        FROM history
+        ORDER BY id DESC
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify([
+        {
+            "username": r[0],
+            "url": r[1],
+            "status": r[2],
+            "score": r[3]
+        }
+        for r in rows
+    ])
 
 @app.route("/logout")
 def logout():
@@ -125,14 +165,28 @@ def signup():
     username = data.get("username")
     password = data.get("password")
 
+    import re
+
+    if len(password) < 6:
+        return jsonify({"success": False, "message": "Password must be at least 6 characters"})
+
+    if not re.search(r"[A-Z]", password):
+        return jsonify({"success": False, "message": "Add at least 1 Capital Letter"})
+
+    if not re.search(r"[0-9]", password):
+        return jsonify({"success": False, "message": "Add at least 1 Number"})
+
     conn = sqlite3.connect("scam.db")
     cursor = conn.cursor()
 
     try:
+        hashed_password = generate_password_hash(password)
+
         cursor.execute(
             "INSERT INTO users (username, password) VALUES (?, ?)",
-            (username, password)
+            (username, hashed_password)
         )
+
         conn.commit()
         return jsonify({"success": True})
     except:
@@ -150,11 +204,17 @@ def login():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT * FROM users WHERE username=? AND password=?",
-        (username, password)
+    "SELECT * FROM users WHERE username=?",
+    (username,)
     )
 
     user = cursor.fetchone()
+
+    if user and check_password_hash(user[2], password):
+       session["user"] = username
+       return jsonify({"success": True})
+    else:
+      return jsonify({"success": False, "message": "Invalid credentials"})
     conn.close()
 
     if user:

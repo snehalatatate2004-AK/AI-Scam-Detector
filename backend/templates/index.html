@@ -172,6 +172,23 @@ button {
     display: block;
 }
 
+.reason-box {
+    background: #0f172a;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.reason-box ul {
+    margin: 5px 0 0 15px;
+    padding: 0;
+}
+
+.reason-box li {
+    margin-bottom: 4px;
+}
+
 </style>
 </head>
 
@@ -271,17 +288,25 @@ async function loadHistory(){
 
         history.innerHTML += `
         <div class="result-card">
-            <h4>🔗 ${item.url}</h4>
-            <p>🌐 ${item.domain}</p>
+        <h4>🔗 ${item.url}</h4>
+        <p>🌐 ${item.domain}</p>
 
-            <div class="progress">
-                <div class="progress-bar" style="width:${item.score}%"></div>
-            </div>
-
-            <p>Score: ${item.score}</p>
-            <p class="${color}">${icon} ${item.status}</p>
+        <div class="progress">
+        <div class="progress-bar" style="width:${item.score}%"></div>
         </div>
-        `;
+
+        <p>Score: ${item.score}</p>
+        <p class="${color}">${icon} ${item.status}</p>
+
+        <div class="reason-box">
+        <b>🧠 Why Scam?</b>
+        <ul>
+            ${(item.reason || "").split("|").map(r => `<li>${r}</li>`).join("")}
+        </ul>
+        </div>
+
+      </div>
+`;
     });
 
     document.getElementById("safeCountText").innerText = safeCount;

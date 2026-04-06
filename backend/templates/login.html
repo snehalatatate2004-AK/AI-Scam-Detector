@@ -130,10 +130,10 @@ async function signup(){
         const data = await res.json();
 
         if(data.success){
-            alert("✅ Signup successful! Now login.");
+          alert("Signup successful!");
         } else {
-            alert(data.message || "User already exists");
-        }
+           alert(data.message);
+          }
 
     }catch(err){
         console.log(err);
