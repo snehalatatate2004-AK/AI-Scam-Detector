@@ -156,6 +156,8 @@ def logout():
     session.pop("user", None)
     return redirect("/")
 
+
+
 # ======================
 # AUTH
 # ======================
@@ -204,20 +206,14 @@ def login():
     cursor = conn.cursor()
 
     cursor.execute(
-    "SELECT * FROM users WHERE username=?",
-    (username,)
+        "SELECT * FROM users WHERE username=?",
+        (username,)
     )
 
     user = cursor.fetchone()
-
-    if user and check_password_hash(user[2], password):
-       session["user"] = username
-       return jsonify({"success": True})
-    else:
-      return jsonify({"success": False, "message": "Invalid credentials"})
     conn.close()
 
-    if user:
+    if user and check_password_hash(user[2], password):
         session["user"] = username
         print("LOGIN SUCCESS:", session.get("user"))
         return jsonify({"success": True})
@@ -254,6 +250,14 @@ def check():
     ml_prediction = 0
     score = 30
     status = "Safe"
+
+    # 🔥 WHY SCAM LIST
+    reason_list = []
+
+# 🔥 HTTP check (NEW)
+    if url.startswith("http://"):
+     score += 20
+    reason_list.append("⚠️ Not secure (HTTP used)")
 
     # ======================
     # TRUSTED DOMAIN
@@ -322,25 +326,29 @@ def check():
         # ======================
         # 🔥 WHY SCAM (FINAL REASON)
         # ======================
-        reason_list = []
+        
 
-        for word in suspicious_words:
-            if word in url.lower():
-                reason_list.append(f"Contains: {word}")
+        # ======================
+# 🔥 WHY SCAM (FINAL REASON)
+# ======================
 
-        if ml_prediction == 1:
-            reason_list.append("AI detected phishing pattern")
+    for word in suspicious_words:
+     if word in url.lower():
+        reason_list.append(f"Contains: {word}")
 
-        if has_password_field:
-            reason_list.append("Login/password field found")
+    if ml_prediction == 1:
+       reason_list.append("AI detected phishing pattern")
 
-        if has_password_field and keyword_flag:
-            reason_list.append("🚨 Fake login page detected")
+    if has_password_field:
+       reason_list.append("Login/password field found")
 
-        if reason_list:
-            reason = " | ".join(reason_list)
-        else:
-            reason = "No major risk detected"
+    if has_password_field and keyword_flag:
+       reason_list.append("🚨 Fake login page detected")
+
+    if reason_list:
+       reason = " | ".join(reason_list)
+    else:
+        reason = "No major risk detected"
 
     # ======================
     # SAVE HISTORY
