@@ -7,21 +7,22 @@ import os
 import sqlite3
 from dotenv import load_dotenv
 from urllib.parse import urlparse
+import requests
+from datetime import datetime
 
 # ======================
 # ENV LOAD
 # ======================
 load_dotenv()
-API_KEY = os.getenv("API_KEY")
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = os.getenv("SECRET_KEY", "fallback_secret")
 
-# 🔥 SESSION FIX
+# SESSION CONFIG
 app.config['SESSION_COOKIE_SAMESITE'] = "Lax"
 app.config['SESSION_COOKIE_SECURE'] = False
 
-# 🔥 CORS FIX
+# CORS
 CORS(app, supports_credentials=True)
 
 # ======================
@@ -54,7 +55,8 @@ def init_db():
         score INTEGER,
         status TEXT,
         reason TEXT,
-        username TEXT
+        username TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
@@ -62,7 +64,8 @@ def init_db():
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
-        password TEXT
+        password TEXT,
+        role TEXT DEFAULT 'user'
     )
     """)
 
@@ -111,22 +114,20 @@ def dashboard():
     if "user" not in session:
         return redirect("/")
 
-    # 🔥 ADMIN CHECK
-    if session["user"] == "admin":
+    if session.get("role") == "admin":
         return redirect("/admin")
 
     return render_template("index.html")
 
 @app.route("/admin")
 def admin():
-    if "user" not in session or session["user"] != "admin":
+    if session.get("role") != "admin":
         return redirect("/")
-
     return render_template("admin.html")
 
 @app.route("/admin-data")
 def admin_data():
-    if "user" not in session or session["user"] != "admin":
+    if session.get("role") != "admin":
         return jsonify([])
 
     conn = sqlite3.connect("scam.db")
@@ -153,10 +154,8 @@ def admin_data():
 
 @app.route("/logout")
 def logout():
-    session.pop("user", None)
+    session.clear()
     return redirect("/")
-
-
 
 # ======================
 # AUTH
@@ -167,16 +166,14 @@ def signup():
     username = data.get("username")
     password = data.get("password")
 
-    import re
-
     if len(password) < 6:
-        return jsonify({"success": False, "message": "Password must be at least 6 characters"})
+        return jsonify({"success": False, "message": "Min 6 chars required"})
 
     if not re.search(r"[A-Z]", password):
-        return jsonify({"success": False, "message": "Add at least 1 Capital Letter"})
+        return jsonify({"success": False, "message": "Add 1 capital letter"})
 
     if not re.search(r"[0-9]", password):
-        return jsonify({"success": False, "message": "Add at least 1 Number"})
+        return jsonify({"success": False, "message": "Add 1 number"})
 
     conn = sqlite3.connect("scam.db")
     cursor = conn.cursor()
@@ -184,15 +181,20 @@ def signup():
     try:
         hashed_password = generate_password_hash(password)
 
+#  (admin set karaycha)
+        role = "admin" if username == "admin" else "user"
+
         cursor.execute(
-            "INSERT INTO users (username, password) VALUES (?, ?)",
-            (username, hashed_password)
-        )
+        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+         (username, hashed_password, role)
+)
 
         conn.commit()
         return jsonify({"success": True})
+
     except:
-        return jsonify({"success": False, "message": "User already exists"})
+        return jsonify({"success": False, "message": "User exists"})
+
     finally:
         conn.close()
 
@@ -206,33 +208,29 @@ def login():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT * FROM users WHERE username=?",
+        "SELECT username, password, role FROM users WHERE username=?",
         (username,)
     )
 
     user = cursor.fetchone()
     conn.close()
 
-    if user and check_password_hash(user[2], password):
-        session["user"] = username
-        print("LOGIN SUCCESS:", session.get("user"))
+    if user and check_password_hash(user[1], password):
+        session["user"] = user[0]
+        session["role"] = user[2]
         return jsonify({"success": True})
     else:
         return jsonify({"success": False, "message": "Invalid credentials"})
 
-# ======================
-# SCAN API (FINAL FIXED LOGIC)
-# ======================
+
+# SCAN API
+
 @app.route("/check", methods=["POST"])
 def check():
-    print("SESSION USER:", session.get("user"))
-
     user = session.get("user", "extension_user")
 
     data = request.get_json()
-    url = data.get("url", "").strip()
-
-    url = normalize_url(url)
+    url = normalize_url(data.get("url", "").strip())
 
     if not url or not is_valid_url(url):
         return jsonify({
@@ -244,77 +242,68 @@ def check():
             "ml_prediction": 0
         })
 
-    domain = get_domain(url) or url
+    domain = get_domain(url)
 
-    # default values
-    ml_prediction = 0
     score = 30
     status = "Safe"
-
-    # 🔥 WHY SCAM LIST
+    ml_prediction = 0
     reason_list = []
 
-# 🔥 HTTP check (NEW)
-    if url.startswith("http://"):
-     score += 20
-    reason_list.append("⚠️ Not secure (HTTP used)")
+    # predefined
+    suspicious_words = [
+    "login", "verify", "bank", "update",
+    "password", "secure", "account", "confirm",
+    "intern", "job", "offer", "free", "bonus"
+    ]
 
-    # ======================
+    has_password_field = False
+    keyword_flag = any(word in url.lower() for word in suspicious_words)
+
+    # HTTP check
+    if url.startswith("http://"):
+        score += 10
+        reason_list.append("⚠️ Not secure (HTTP used)")
+
     # TRUSTED DOMAIN
-    # ======================
     if domain in TRUSTED_DOMAINS:
         score = 5
         status = "Safe"
         reason = "Trusted verified domain"
 
     else:
-        # ======================
-        # FETCH HTML
-        # ======================
+        # Fetch HTML
         html_content = ""
         try:
-            import requests
-            res = requests.get(url, timeout=5)
+            res = requests.get(url, timeout=3, headers={"User-Agent": "Mozilla/5.0"})
             html_content = res.text.lower()
         except:
-            html_content = ""
+            pass
 
-        # ======================
-        # SUSPICIOUS WORDS
-        # ======================
-        suspicious_words = [
-            "login", "verify", "bank", "update",
-            "password", "secure", "account", "confirm"
-        ]
+        has_password_field = 'type="password"' in html_content
 
-        has_password_field = "type=\"password\"" in html_content
-        keyword_flag = any(word in url.lower() for word in suspicious_words)
-
-        # ======================
-        # ML PREDICTION
-        # ======================
+        # ML Prediction
         try:
             X_ml = vectorizer.transform([url])
             ml_prediction = model.predict(X_ml)[0]
         except:
             ml_prediction = 0
 
-        # ======================
-        # SCORE CALCULATION
-        # ======================
+        # Scoring
         for word in suspicious_words:
             if word in url.lower():
                 score += 10
+                reason_list.append(f"Contains: {word}")
 
         if ml_prediction == 1:
             score += 40
+            reason_list.append("AI detected phishing pattern")
 
-        # ======================
-        # FAKE LOGIN DETECTION
-        # ======================
+        # Fake login detection
         if has_password_field and keyword_flag:
             score = 95
             status = "Dangerous"
+            reason_list.append("🚨 Fake login page detected")
+
         else:
             if score >= 80:
                 status = "Dangerous"
@@ -323,43 +312,20 @@ def check():
             else:
                 status = "Safe"
 
-        # ======================
-        # 🔥 WHY SCAM (FINAL REASON)
-        # ======================
-        
+        if has_password_field:
+            reason_list.append("Login/password field found")
 
-        # ======================
-# 🔥 WHY SCAM (FINAL REASON)
-# ======================
-
-    for word in suspicious_words:
-     if word in url.lower():
-        reason_list.append(f"Contains: {word}")
-
-    if ml_prediction == 1:
-       reason_list.append("AI detected phishing pattern")
-
-    if has_password_field:
-       reason_list.append("Login/password field found")
-
-    if has_password_field and keyword_flag:
-       reason_list.append("🚨 Fake login page detected")
-
-    if reason_list:
-       reason = " | ".join(reason_list)
-    else:
-        reason = "No major risk detected"
-
-    # ======================
+        reason = " | ".join(reason_list) if reason_list else "No major risk detected"
+    #  SCORE LIMIT FIX
+    score = min(score, 100)
     # SAVE HISTORY
-    # ======================
     conn = sqlite3.connect("scam.db")
     cursor = conn.cursor()
 
     cursor.execute("""
     INSERT INTO history (url, domain, score, status, reason, username)
     VALUES (?, ?, ?, ?, ?, ?)
-""", (url, domain, score, status, reason, user))
+    """, (url, domain, score, status, reason, user))
 
     conn.commit()
     conn.close()
@@ -374,7 +340,7 @@ def check():
     })
 
 # ======================
-# HISTORY (USER-WISE)
+# HISTORY
 # ======================
 @app.route("/history")
 def history():

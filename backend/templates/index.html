@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AI Scam Detector Dashboard</title>
+<title> AI Scam Detector Dashboard</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -11,7 +11,7 @@
 body {
     margin: 0;
     font-family: Arial;
-    background: #556482;
+    background:#c9cfd7;
     color: white;
 }
 
@@ -110,7 +110,7 @@ button {
     background: linear-gradient(90deg, #22c55e, #facc15, #ef4444);
 }
 
-/* ✅ FIX 2: SCROLLABLE HISTORY */
+/*  SCROLLABLE HISTORY */
 #history {
     max-height: 250px;
     overflow-y: auto;
@@ -196,14 +196,14 @@ button {
 
 <div class="header">
 
-    <div class="header-title">🔐 AI Scam Detection Dashboard</div>
+    <div class="header-title"> AI Scam Detection Dashboard</div>
 
     <div class="profile" onclick="toggleMenu()">
         <img src="https://static.vecteezy.com/system/resources/previews/020/526/176/original/3d-user-login-or-verification-icon-human-symbol-mobile-ui-ux-app-icons-vector.jpg"
              class="avatar">
 
         <div id="dropdown" class="dropdown">
-            <p onclick="logout()">🚪 Logout</p>
+            <p onclick="logout()"> Logout</p>
         </div>
     </div>
 
@@ -299,7 +299,7 @@ async function loadHistory(){
         <p class="${color}">${icon} ${item.status}</p>
 
         <div class="reason-box">
-        <b>🧠 Why Scam?</b>
+        <b> Why Scam?</b>
         <ul>
             ${(item.reason || "").split("|").map(r => `<li>${r}</li>`).join("")}
         </ul>

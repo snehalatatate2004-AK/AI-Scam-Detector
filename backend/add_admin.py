@@ -5,7 +5,7 @@ cursor = conn.cursor()
 
 cursor.execute(
     "INSERT INTO users (username, password) VALUES (?, ?)",
-    ("admin", "admin123")
+    ("admin", "Admin123")
 )
 
 conn.commit()

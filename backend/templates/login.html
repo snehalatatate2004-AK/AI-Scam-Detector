@@ -8,12 +8,12 @@ body{
     text-align:center;
     margin-top:100px;
     font-family:Arial;
-    background:#556482;
+    background:#c9cfd7;
     color:white;
 }
 
 .card{
-    background:#1f2937;
+    background: rgba(0,0,0,0.7);
     padding:30px;
     border-radius:15px;
     width:300px;
@@ -56,7 +56,7 @@ button:hover{
 <body>
 
 <div class="card">
-    <h2>🔐 Login</h2>
+    <h2> Login</h2>
 
     <input id="user" placeholder="Username">
     <input id="pass" type="password" placeholder="Password">
@@ -69,7 +69,7 @@ button:hover{
 
 <script>
 
-// 🔥 LOGIN FUNCTION
+// LOGIN FUNCTION
 async function login(){
 
     const username = document.getElementById("user").value.trim();
@@ -107,7 +107,7 @@ async function login(){
 }
 
 
-// 🔥 SIGNUP FUNCTION
+//  SIGNUP FUNCTION
 async function signup(){
 
     const username = document.getElementById("user").value.trim();
